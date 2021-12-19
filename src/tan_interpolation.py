@@ -43,7 +43,6 @@ parser.add_argument('--only-periodic', type=str, default=None)
 parser.add_argument('--dropout', type=float, default=0.0)
 args = parser.parse_args()
 
-
 if __name__ == '__main__':
     experiment_id = int(SystemRandom().random() * 100000)
     print(args, experiment_id)
@@ -52,8 +51,8 @@ if __name__ == '__main__':
     np.random.seed(seed)
     torch.cuda.manual_seed(seed)
 
-    device = torch.device(
-        'cuda' if torch.cuda.is_available() else 'cpu')
+    device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = torch.device(device_name)
 
     if args.dataset == 'toy':
         data_obj = utils.kernel_smoother_data_gen(args, alpha=100., seed=0)
@@ -67,23 +66,21 @@ if __name__ == '__main__':
     # model
     if args.enc == 'enc_rnn3':
         rec = models.enc_rnn3(
-            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, 
-            args.rec_hidden, 128, learn_emb=args.learn_emb).to(device)
+            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim,
+            args.rec_hidden, 128, learn_emb=args.learn_emb, device=device_name).to(device)
     elif args.enc == 'mtan_rnn':
         rec = models.enc_mtan_rnn(
-            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, args.rec_hidden, 
-            embed_time=128, learn_emb=args.learn_emb, num_heads=args.enc_num_heads).to(device)
-   
-        
+            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, args.rec_hidden,
+            embed_time=128, learn_emb=args.learn_emb, num_heads=args.enc_num_heads, device=device_name).to(device)
+
     if args.dec == 'rnn3':
         dec = models.dec_rnn3(
-            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, 
-            args.gen_hidden, 128, learn_emb=args.learn_emb).to(device)
+            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim,
+            args.gen_hidden, 128, learn_emb=args.learn_emb, device=device_name).to(device)
     elif args.dec == 'mtan_rnn':
         dec = models.dec_mtan_rnn(
-            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, args.gen_hidden, 
-            embed_time=128, learn_emb=args.learn_emb, num_heads=args.dec_num_heads).to(device)
-
+            dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, args.gen_hidden,
+            embed_time=128, learn_emb=args.learn_emb, num_heads=args.dec_num_heads, device=device_name).to(device)
 
     params = (list(dec.parameters()) + list(rec.parameters()))
     optimizer = optim.Adam(params, lr=args.lr)
@@ -94,12 +91,12 @@ if __name__ == '__main__':
         dec.load_state_dict(checkpoint['dec_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         print('loading saved weights', checkpoint['epoch'])
-        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 1))
-        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 3))
-        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 10))
-        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 20))
-        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 30))
-        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 50))
+        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 1, device=device_name))
+        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 3, device=device_name))
+        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 10, device=device_name))
+        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 20, device=device_name))
+        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 30, device=device_name))
+        print('Test MSE', utils.evaluate(dim, rec, dec, test_loader, args, 50, device=device_name))
 
     for itr in range(1, args.niters + 1):
         train_loss = 0
@@ -156,9 +153,9 @@ if __name__ == '__main__':
                 observed_data, pred_x.mean(0), observed_mask) * batch_len
 
         print('Iter: {}, avg elbo: {:.4f}, avg reconst: {:.4f}, avg kl: {:.4f}, mse: {:.6f}'
-            .format(itr, train_loss / train_n, -avg_reconst / train_n, avg_kl / train_n, mse / train_n))
+              .format(itr, train_loss / train_n, -avg_reconst / train_n, avg_kl / train_n, mse / train_n))
         if itr % 10 == 0:
-            print('Test Mean Squared Error', utils.evaluate(dim, rec, dec, test_loader, args, 1))
+            print('Test Mean Squared Error', utils.evaluate(dim, rec, dec, test_loader, args, 1, device=device_name))
         if itr % 10 == 0 and args.save:
             torch.save({
                 'args': args,
@@ -168,4 +165,4 @@ if __name__ == '__main__':
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': -loss,
             }, args.dataset + '_' + args.enc + '_' + args.dec + '_' +
-                str(experiment_id) + '.h5')
+               str(experiment_id) + '.h5')
