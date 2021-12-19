@@ -55,8 +55,8 @@ if __name__ == '__main__':
     np.random.seed(seed)
     torch.cuda.manual_seed(seed)
     random.seed(seed)
-    device = torch.device(
-        'cuda' if torch.cuda.is_available() else 'cpu')
+    device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = torch.device(device_name)
     
     if args.dataset == 'physionet':
         data_obj = utils.get_physionet_data(args, 'cpu', args.quantization)
@@ -70,19 +70,19 @@ if __name__ == '__main__':
     
     if args.enc == 'enc_rnn3':
         rec = models.enc_rnn3(
-            dim, torch.linspace(0, 1., 128), args.latent_dim, args.rec_hidden, 128, learn_emb=args.learn_emb).to(device)
+            dim, torch.linspace(0, 1., 128), args.latent_dim, args.rec_hidden, 128, learn_emb=args.learn_emb, device=device_name).to(device)
     elif args.enc == 'mtan_rnn':
         rec = models.enc_mtan_rnn(
             dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, args.rec_hidden, 
-            embed_time=128, learn_emb=args.learn_emb, num_heads=args.enc_num_heads).to(device)
+            embed_time=128, learn_emb=args.learn_emb, num_heads=args.enc_num_heads, device=device_name).to(device)
 
     if args.dec == 'rnn3':
         dec = models.dec_rnn3(
-            dim, torch.linspace(0, 1., 128), args.latent_dim, args.gen_hidden, 128, learn_emb=args.learn_emb).to(device)
+            dim, torch.linspace(0, 1., 128), args.latent_dim, args.gen_hidden, 128, learn_emb=args.learn_emb, device=device_name).to(device)
     elif args.dec == 'mtan_rnn':
         dec = models.dec_mtan_rnn(
             dim, torch.linspace(0, 1., args.num_ref_points), args.latent_dim, args.gen_hidden, 
-            embed_time=128, learn_emb=args.learn_emb, num_heads=args.dec_num_heads).to(device)
+            embed_time=128, learn_emb=args.learn_emb, num_heads=args.dec_num_heads, device=device_name).to(device)
     
     classifier = models.create_classifier(args.latent_dim, args.rec_hidden).to(device)
     params = (list(rec.parameters()) + list(dec.parameters()) + list(classifier.parameters()))
@@ -147,7 +147,7 @@ if __name__ == '__main__':
                                       observed_mask) * batch_len
         total_time += time.time() - start_time
         val_loss, val_acc, val_auc = utils.evaluate_classifier(
-            rec, val_loader, args=args, classifier=classifier, reconst=True, num_sample=1, dim=dim)
+            rec, val_loader, args=args, classifier=classifier, reconst=True, num_sample=1, dim=dim, device=device_name)
         if val_loss <= best_val_loss:
             best_val_loss = min(best_val_loss, val_loss)
             rec_state_dict = rec.state_dict()
@@ -155,7 +155,7 @@ if __name__ == '__main__':
             classifier_state_dict = classifier.state_dict()
             optimizer_state_dict = optimizer.state_dict()
         test_loss, test_acc, test_auc = utils.evaluate_classifier(
-            rec, test_loader, args=args, classifier=classifier, reconst=True, num_sample=1, dim=dim)
+            rec, test_loader, args=args, classifier=classifier, reconst=True, num_sample=1, dim=dim, device=device_name)
         print('Iter: {}, recon_loss: {:.4f}, ce_loss: {:.4f}, acc: {:.4f}, mse: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}, test_acc: {:.4f}, test_auc: {:.4f}'
               .format(itr, train_recon_loss/train_n, train_ce_loss/train_n, 
                       train_acc/train_n, mse/train_n, val_loss, val_acc, test_acc, test_auc))
